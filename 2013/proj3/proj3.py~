@@ -1,0 +1,222 @@
+'''
+Author:
+
+Sanyk28 (san-heng-yi-shu@163.com)
+
+Date Created:
+
+14 Oct 2013
+
+Notes:
+
+This code is an attempt to satisfy the requirements of Project 3 for the
+University of Melbourne subject COMP10001 "Foundations of Computing".
+ 
+The program is designed to be used with Python 2.6 and 2.7.
+
+Usage:
+
+python proj3.py [input file]
+
+'''
+
+def read_file(filename):
+    f = open(filename,'rb')
+    reader = csv.reader(f)
+    data = [row for row in reader]
+    f.close()
+    return data
+
+def header(data):
+    HEADER = 'read_start,read_end'
+    if data[0] != HEADER.split(','):
+        return False
+    return True
+
+def _length(data):
+    try:
+        for row in data[1:]:
+            if len(row) <= 0:
+                return False
+        return True
+    except ValueError:
+        return False
+
+def _value(data):
+    try:
+        for v1, v2 in data[1:]:
+            if not isinstance(eval(v1), int):
+                return False
+            elif not isinstance(eval(v2), int):
+                return False
+            elif eval(v1) < 0:
+                return False
+            elif eval(v2) < 0:
+                return False
+        return True
+    except ValueError:
+        return False
+
+def compare(data):
+    try:
+        for v1, v2 in data[1:]:
+            if eval(v1) > eval(v2):
+                return False
+        return True
+    except ValueError:
+        return False
+
+def validate_alignment(alignment_filename):
+    data = read_file(alignment_filename)
+    if not header(data):
+        return False
+    elif not _length(data):
+        return False
+    elif not _value(data):
+        return False
+    elif not compare(data):
+        return False
+    return True
+
+def coverage(starts, ends, region_start, region_end):
+    '''
+    Given: read coordinates and reference genome coordinates, this function calculates the coverage of a piece of reference genome.
+    Input parameters:
+          starts: a list of integers. Each interger coresponds to the start coordinate of the reads
+          ends: a list of integers. Each interger coresponds to the end coordinate of the reads
+          region_start: an integer that represends the start coordinate of the reference genome
+          region_end: an integer that represends the end coordinate of the reference genome
+    Return: a list of integers. Each number corresponds to the number of reads that covers a given coordinate at the reference genome.
+    Example:
+    >>> coverage([1,2,3,4,5,8,9,10],[23,26,27,29,32,33,38,40],3,37)
+    [3, 4, 5, 5, 5, 6, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 6, 5, 5, 4, 4, 4, 3, 2, 2, 2, 2]
+
+    An explanation of how the function works.
+
+    Note that the function assumes the following about its arguments: 
+    1. Input parameter starts and ends store a list of integers
+    2. The lengths of starts and ends are the same
+    3. The value of the item in starts is no greater than that in ends of the same index
+    4. Input parameter region_start and region_end are integers
+    5. The value of region_start is less than that of region_end
+    '''
+
+    # Define a list that records the number of reads covering each coordinate in a given region of the reference genome
+    counts = []
+
+    # Define an integer that calculates the number of reads at a given coordinate of the reference genome
+    running_coverage = 0 
+
+    # The following for loop compares each referece genome coordinate in the region (this_coord) with read start coordinate and read end coordinate in starts and ends respectively.
+    # A reference genome coordinate is assured to be covered by a read if and only if the reference genome coordinate is no less than a read start coordinate and less than end coordinate of the same read.
+    for this_coord in range(region_start, region_end + 1):
+
+        # print 'this_coord: '+str(this_coord)
+        # If reference genome coordinate (this_coord) is no less than a read start coordinate, then the read is likely to cover the desired refernce genome coordinate.
+        # The program will add 1 more record to running_coverage, and handle in second while loop if this_coord is greater than the end coordinate of the same read.
+        # Then the program moves on to compare this_coord with next read start coordinate.
+        # Such comparasion continues until the reference genome coodinate (this_coord) is less than a read start coordinate.
+        # In this case, the read is assured to uncover the desired reference genome coordinate. The program will not do anything but break the first while loop.
+        while starts:
+            this_start = starts[0]
+            # print 'this_start: '+ str(this_start)
+            if this_coord >= this_start:
+                running_coverage += 1
+                # print 'running_coverage: ' + str(running_coverage)
+                starts = starts[1:]
+                # print 'starts: '+str(starts)
+            elif this_coord < this_start:
+                # print 'this_coord < this_start: break'
+                break
+        
+        # If reference genome coordinate (this_record) is greater than a read end coordinate, then the read is not covering the desired reference genome region.
+        # But because when this_coord is greater than a read end coordinate, this_coord must be greater than a read start coordinate.
+        # According to the above while loop, as long as this_coord is no less than a read start coordinate, the program adds 1 more record to running_coverage.
+        # Therefore the program has mistakenly add 1 more record to running_coverage and needs to remove 1 record from running_coverage.
+        # If the reference genome coordinate (this_record) is less than a read end coordinate, then the read may cover this reference genome coordinate.
+        # In this case, the program will do nothing but break the second while loop.
+        while ends:
+            this_end = ends[0] + 1
+            # print 'this_end: '+str(this_end)
+            if this_coord >= this_end:
+               running_coverage -= 1
+               # print 'running_coverage: '+str(running_coverage)
+               ends = ends[1:]
+               # print 'ends: '+str(ends)
+            elif this_coord < this_end:
+               # print 'this_coord < this_end: break'
+               break
+     
+        # The number of reads that coverage this referece genome coodinate (this_coord) has been calculated from the above two while loops.
+        # The program then records the result to pre-defined list count.
+        counts.append(running_coverage)
+    # print 'counts: '+str(counts)
+    return counts
+
+def plot_coverage(title, region_start, region_end, alignment_filename):
+    '''
+    title: a string specifying the text for the title of the bar chart.
+    region_start: a non-negative integer specifying the start position of the region of interest.
+    region_end: a non-negative integer specifying the end position of the region of interest.
+    alignment_filename: a string specifying the name of an alignment file, the name must end in .csv
+    '''
+    if not validate_alignment(alignment_filename):
+        return None
+        exit()
+    data = read_file(alignment_filename)[1:]
+    starts = [eval(row[0]) for row in data]
+    ends = [eval(row[1]) for row in data]
+    
+    counts = coverage(starts, ends, region_start, region_end)
+    
+    alignment_filename = alignment_filename.replace('.csv', '.svg')
+    svg_file = plot.plot_graph(region_start, region_end, counts, title, alignment_filename)
+    
+    if len(counts) == 0:
+        minimum_coverage, maximum_coverage, average_coverage = 0, 0, 0
+    else:
+        minimum_coverage = min(item for item in counts)
+        maximum_coverage = max(item for item in counts)
+        average_coverage = sum(counts)/float(len(counts))        
+    return (minimum_coverage, maximum_coverage, round(average_coverage,2))
+    
+
+def write_html(samples_filename):
+    f = open(samples_filename.split('.')[0]+'.html', 'w')
+    f.write('<!DOCTYPE html>\n<html>\n\t<head><title>DNA sequence alignment coverage</title></head>\n'+' '*(4*1)+'<body>\n'+' '*(4*1)+'<h1>DNA sequence alignment coverage</h1>\n'+' '*(4*2)+'<h2>Sample 1</h2>\n'+' '*(4*2)+'<ul>\n'+' '*(4*3)+'<li>file: example1.csv</li>\n'+' '*(4*3)+'<li>minimum depth: 0</li>\n'+' '*(4*4)+'<li>maximum depth: 5</li>\n'+'<li>average depth: 2.65</li>\n        </ul>\n            <img src="example1.svg"\n                alt="read alignment coverage bar chart for example1.csv"/>\n            <h2>Sample 2</h2>\n        <ul>\n            <li>file: example2.csv</li>\n            <li>minimum depth: 0</li>\n            <li>maximum depth: 6</li>\n            <li>average depth: 2.97</li>\n        </ul>\n        <img src="example2.svg"\n            alt="read alignment coverage bar chart for example2.csv"/>\n    </body>\n</html>')
+    return f
+    f.close()
+
+def document_samples(samples_filename):
+    '''
+    title: a title for the data set to be displayed in the corresponding bar chart.
+    alignment filename: the name of the alignment file for the data set.
+    region start: the start position for the region of interest.
+    region end: the end position for the region of interest.
+    '''
+    if not samples_filename.endswith('.csv'):
+        samples_filename = samples_filename.split('.')[0]+'.csv'
+    sample_data  = read_file(samples_filename)[1:]
+    sample_data = [record for record in sample_data if validate_alignment(record[1])]
+    countss = [plot_coverage(title, eval(region_start), eval(region_end), filename) for title, filename, region_start, region_end in sample_data]
+    
+    '''
+    It should write to an output file in HTML format.
+    The format and content of the HTML document should follow the example below
+    noting that each data set is numbered sequentially from 1 upwards, and the average coverage is displayed to 2 decimal places. 
+    The name of the output HTML file should be based on the name of the input CSV file, with the '.csv' suffix replaced by '.html'. 
+    '''
+    return None
+
+
+if __name__ == '__main__':
+
+    import sys
+    import csv
+    import plot
+
+    alignment_filename = sys.argv[-1]
+    data = read_file(alignment_filename)
+    # print plot_coverage('Project Spec Example', 23, 42, alignment_filename)
+    # print document_samples(alignment_filename)
+    write_html(alignment_filename)
